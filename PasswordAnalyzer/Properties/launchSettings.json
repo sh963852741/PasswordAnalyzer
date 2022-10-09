@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PasswordAnalyzer": {
+      "commandName": "Project",
+      "commandLineArgs": "--file filtered_csdn.txt"
+    }
+  }
+}
