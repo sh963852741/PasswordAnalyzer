@@ -1,8 +1,7 @@
-﻿using System.IO.Pipelines;
-using System.IO.Pipes;
-
+﻿
 namespace PasswordAnalyzer
 {
+
     internal class Program
     {
         static void Main(string[] args)
