@@ -46,11 +46,48 @@ namespace PasswordAnalyzer
         private Thread thread = null!;
         private NamedPipeServerStream pipe = null!;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
+        private System.Timers.Timer timer = new(1000);
+        private ulong lastSecondGuessedNumber = 0;
+        /// <summary>
+        /// 当前程序处理速度（每秒）
+        /// </summary>
+        private int speed = 0;
+
+        /// <summary>
+        /// 密码被猜中
+        /// </summary>
+        /// <param name="sender">事件发送者</param>
+        /// <param name="password">被猜中的密码</param>
+        /// <param name="guessedNumber">第几个被猜中的密码（包含本次，从1开始）</param>
+        /// <param name="guessedNumber">已经猜了多少次（包含本次，从1开始）</param>
+        public delegate void PasswordHitedHandler(object? sender, string password,int hitedNumber, ulong guessedNumber);
+
+        /// <summary>
+        /// 密码被猜中事件
+        /// </summary>
+        public event PasswordHitedHandler PasswordHitedEvent = default!;
+
+        public PasswordCracker()
+        {
+            timer.AutoReset = true;
+            timer.Elapsed += Timer_Elapsed;
+        }
+
+        private void Timer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+        {
+            speed = (int)(PasswordTried - lastSecondGuessedNumber);
+            lastSecondGuessedNumber = PasswordTried;
+
+            Console.Write(new string(' ', Console.BufferWidth));
+            Console.SetCursorPosition(0, Console.CursorTop);
+            PrintStatus();
+            Console.SetCursorPosition(0, Console.CursorTop-1);
+        }
 
         /// <summary>
         /// 加载测试集密码文件
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="path">文件路径</param>
         public bool LoadFile(string path)
         {
             StreamReader sr;
@@ -95,6 +132,8 @@ namespace PasswordAnalyzer
 
             thread = new(PipeLineReadThread!);
             thread.Start(cts.Token);
+
+            timer.Start();
         }
 
         /// <summary>
@@ -124,16 +163,18 @@ namespace PasswordAnalyzer
                 string? line = reader.ReadLine();
                 if (line == null) continue;
 
+                ++PasswordTried;
                 if (hitPwdDict.ContainsKey(line))
                 {
                     ++hitPwdDict[line];
                     ++HitedPasswordCount;
+                    PasswordHitedEvent(this, line, HitedPasswordCount, PasswordTried);
                 }
                 else
                 {
 
                 }
-                ++PasswordTried;
+                
             }
 
         }
@@ -143,6 +184,7 @@ namespace PasswordAnalyzer
         /// </summary>
         public void StopThread()
         {
+            timer.Stop();
             cts.Cancel();
             thread.Join();
         }
@@ -163,9 +205,8 @@ namespace PasswordAnalyzer
                 {
 
                 }
-                Console.WriteLine();
-                Console.WriteLine($"程序{pipe.GetImpersonationUserName()}");
-                Console.WriteLine($"已处理密码{PasswordTried}个\t{HitedPasswordCount}条密码命中测试集");
+                Console.WriteLine($"程序{i}");
+                Console.WriteLine($"已处理密码{PasswordTried}个\t{HitedPasswordCount}条密码命中测试集。当前速度{speed}条/秒。");
             }
             else
             {
@@ -175,6 +216,7 @@ namespace PasswordAnalyzer
         ~PasswordCracker()
         {
             StopThread();
+            timer.Dispose();
             pipe.Close();
         }
     }
